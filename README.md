@@ -16,7 +16,19 @@ Search your entire image and video library using **natural language or an image*
 
 ## 💛 Support the Developer
 
-Makimus-AI is completely **free and open source**. If it saves you time and you'd like to support continued development, any amount is appreciated!
+Makimus-AI is completely **free and open source**. The source code is available here on GitHub for anyone who wants to set it up manually using Python.
+
+### 📦 Want a hassle-free experience?
+
+A **pre-packaged Windows installer** is available — everything bundled in one click: Python, CUDA, and the AI model included. No internet connection required after download, no terminal, no configuration, no technical knowledge needed. Just install and start searching.
+
+<br>
+
+👉 **[Get the Windows installer on Payhip](https://payhip.com/b/ZUEPu)**
+
+<br>
+
+If you use the free GitHub version and find it useful, donations are appreciated:
 
 | Method | Address |
 |--------|---------|
@@ -198,7 +210,7 @@ pip install -r requirements.txt
 ### Searching
 - **Text search:** Type any description in the search box and press Enter or click **Search**
   - Examples: *"sunset over ocean"*, *"person in blue jacket"*, *"fight scene"*
-  - **Negative terms:** Add a minus sign before a word to exclude it — *"cat -dog"* finds cats without dogs
+  - **Negative terms:** Add a minus sign before a word to exclude it — *"cat -dog"* finds cats without dogs. For best results with negative terms, lower the **Similarity Score** slider to **0.10 or below**
 - **Image search:** Click the **Image** button next to the search box and select any image — the app finds visually similar results from your entire library
 - Use the **Similarity Score** slider to tune results:
   - Lower = more results, broader match
@@ -234,7 +246,7 @@ pip install -r requirements.txt
 - 🖼️ **Image-to-image search** — find visually similar images using a query image
 - 🎬 **Text-to-video search** — search your entire video library using text descriptions
 - 🎬 **Image-to-video search** — find video frames visually similar to a query image
-- ➖ **Negative search terms** — exclude unwanted content with minus prefixes
+- ➖ **Negative search terms** — exclude unwanted content with minus prefixes (e.g. *"cat -dog"*). Lower the similarity score to 0.10 or below for best results
 - 📷 **RAW photo support** — full indexing and display for ARW, CR2, NEF, DNG, ORF, RW2, RAF, PEF, SR2
 - 🎞️ **Video support** — MP4, MKV, MOV, AVI, WEBM, M4V, WMV, FLV, TS, MPG and more
 - ⚡ **GPU accelerated** — CUDA (NVIDIA), Apple MPS, DirectML (AMD/Intel on Windows)
@@ -273,6 +285,14 @@ pip install -r requirements.txt
 | Pretrained on | laion2b_s32b_b82k |
 | Library | open_clip_torch |
 | Download size | ~1.7 GB (automatic on first run, cached locally) |
+
+**Why ViT-L-14 on LAION-2B?**
+
+ViT-L-14 is one of the largest and most capable open CLIP models available. It was trained on LAION-2B — a dataset of 2 billion image-text pairs scraped from the real internet, completely uncurated and unfiltered. This matters because most commercial models are trained on carefully filtered datasets that exclude large categories of content.
+
+Because LAION-2B reflects what actually exists on the internet, the model understands an extremely wide range of visual content: photography, illustrations, anime, art styles, adult content, niche genres, and everything in between. It handles abstract descriptions just as well as specific visual details, and works equally well across languages since the training data is multilingual.
+
+This makes it significantly more versatile for diverse personal media collections compared to models trained on sanitized or domain-specific datasets — which is exactly what Makimus-AI is designed for.
 
 ---
 
