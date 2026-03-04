@@ -137,25 +137,25 @@ pip install -r requirements.txt
 
 > **Older NVIDIA GPUs (GTX 900 series and earlier):** If installation fails or CUDA is not detected, try CUDA 12.6 instead:
 > ```bash
-> pip install Pillow==12.0.0 numpy==2.2.6 open_clip_torch==3.2.0 rawpy==0.26.1 opencv-python==4.13.0.92 Send2Trash==2.1.0
+> pip install Pillow==12.0.0 numpy==2.2.6 open_clip_torch==3.2.0 rawpy==0.26.1 opencv-python==4.13.0.92 Send2Trash==2.1.0 tkinterdnd2
 > pip install torch==2.9.1+cu126 torchvision==0.24.1+cu126 --index-url https://download.pytorch.org/whl/cu126
 > ```
 
 **Apple Silicon (MPS) — GPU acceleration built in, no extras needed:**
 ```bash
-pip install Pillow==12.0.0 numpy==2.2.6 open_clip_torch==3.2.0 rawpy==0.26.1 opencv-python==4.13.0.92 Send2Trash==2.1.0
+pip install Pillow==12.0.0 numpy==2.2.6 open_clip_torch==3.2.0 rawpy==0.26.1 opencv-python==4.13.0.92 Send2Trash==2.1.0 tkinterdnd2
 pip install torch==2.10.0 torchvision==0.25.0
 ```
 
 **No NVIDIA GPU / CPU only:**
 ```bash
-pip install Pillow==12.0.0 numpy==2.2.6 open_clip_torch==3.2.0 rawpy==0.26.1 opencv-python==4.13.0.92 Send2Trash==2.1.0
+pip install Pillow==12.0.0 numpy==2.2.6 open_clip_torch==3.2.0 rawpy==0.26.1 opencv-python==4.13.0.92 Send2Trash==2.1.0 tkinterdnd2
 pip install torch==2.10.0 torchvision==0.25.0
 ```
 
 **AMD GPU — Windows (DirectML):**
 ```bash
-pip install Pillow==12.0.0 numpy==2.2.6 open_clip_torch==3.2.0 rawpy==0.26.1 opencv-python==4.13.0.92 Send2Trash==2.1.0
+pip install Pillow==12.0.0 numpy==2.2.6 open_clip_torch==3.2.0 rawpy==0.26.1 opencv-python==4.13.0.92 Send2Trash==2.1.0 tkinterdnd2
 pip install torch==2.10.0 torchvision==0.25.0
 pip install torch-directml
 ```
@@ -208,20 +208,17 @@ pip install -r requirements.txt
 4. Indexing runs in the background with a progress bar. You can start searching before it finishes.
 
 ### Searching
-- **Text search:** Type any description in the search box and press Enter or click **Search**
-  - Examples: *"sunset over ocean"*, *"person in blue jacket"*, *"fight scene"*
-  - **Negative terms:** Add a minus sign before a word to exclude it — *"cat -dog"* finds cats without dogs. For best results with negative terms, lower the **Similarity Score** slider to **0.10 or below**
-- **Image search:** Click the **Image** button next to the search box and select any image — the app finds visually similar results from your entire library
-- Use the **Similarity Score** slider to tune results:
-  - Lower = more results, broader match
-  - Higher = fewer results, closer match
+- **Text search:** Just type what you're looking for and hit Enter or click Search. You don't need exact filenames — describe the content. *"sunset over ocean"*, *"person in blue jacket"*, *"fight scene"* all work.
+  - **Negative terms:** Put a minus sign before any word to exclude it — *"cat -dog"* finds cats without dogs in the image. Lower the Similarity Score to 0.10 or below when using negative terms for the best results.
+- **Image search:** Click the **Image** button and pick any image from your computer, or just **drag and drop an image directly onto the app** — Makimus will find everything in your collection that looks visually similar. Works for both images and video frames.
+- The **Similarity Score** slider controls how strict the matching is. Lower it to get more results, raise it to get only close matches.
 
 ### Working with Results
-- **Single click** a thumbnail → opens the file location in Explorer / Finder / Dolphin
-- **Double click** a thumbnail → opens the file in your default viewer / player
-- **Right-click** a thumbnail → context menu: open, show in folder, copy to folder, move to folder, delete to recycle bin, select/deselect
-- **Click and drag** on empty canvas space → rubber-band select multiple results at once
-- Use the **Show Images / Show Videos** toggles to filter what's displayed
+- **Single click** → opens the file's location in Explorer / Finder / Dolphin
+- **Double click** → opens the file in your default viewer or player
+- **Right-click** → context menu with open, show in folder, copy, move, delete, select/deselect
+- **Click and drag** on empty space in the results area → rubber-band select multiple files at once
+- Use the **Images / Videos** toggle buttons to show only what you want
 
 ### Video Search
 - Video results show a thumbnail of the matching frame with a timestamp (e.g. `t=1:23`)
@@ -229,14 +226,13 @@ pip install -r requirements.txt
 - Double-clicking a video result opens it in your default player
 
 ### File Operations
-- Select results using right-click or rubber-band drag, then use the toolbar to **Export** (copy) or **Move** them to any folder
-- **Delete to Recycle Bin** — right-click any result to safely delete it. Files go to your system Recycle Bin and can be recovered if needed
-- Selection is preserved after copy/move so you can chain operations (e.g. copy to one folder, then move to another) without reselecting
+- Select files using right-click or rubber-band drag, then hit **Export** to copy them somewhere or **Move** to relocate them. Your selection stays active after the operation so you can copy to one place and move to another without reselecting.
+- **Delete to Recycle Bin** — right-click any result and delete it safely. Goes to your Recycle Bin so you can recover it if needed.
 
 ### Managing Your Index
-- **Refresh** — scans your folder for new or deleted files and updates the index incrementally without re-processing everything. **This is the correct way to update your index after adding new files.**
-- The cache is stored inside your media folder and detected automatically next time you open that folder. **Renaming or moving the folder does not break the cache** — relative paths are used internally.
-- Cache management is automatic — the app protects existing cache from accidental overwrites and only updates what has changed.
+- **Refresh** — added new files to your folder? Just hit Refresh. It scans for changes and only processes what's new or removed — no need to re-index everything from scratch.
+- The cache file lives inside your media folder and loads automatically next time you open that folder. You can rename or move the folder and the cache still works — it uses relative paths internally.
+- Cache management is fully automatic. The app won't overwrite a good cache with a partial one.
 
 ---
 
@@ -247,6 +243,7 @@ pip install -r requirements.txt
 - 🎬 **Text-to-video search** — search your entire video library using text descriptions
 - 🎬 **Image-to-video search** — find video frames visually similar to a query image
 - ➖ **Negative search terms** — exclude unwanted content with minus prefixes (e.g. *"cat -dog"*). Lower the similarity score to 0.10 or below for best results
+- 🖱️ **Drag and drop image search** — drag any image from File Explorer directly onto the app to search by visual similarity instantly
 - 📷 **RAW photo support** — full indexing and display for ARW, CR2, NEF, DNG, ORF, RW2, RAF, PEF, SR2
 - 🎞️ **Video support** — MP4, MKV, MOV, AVI, WEBM, M4V, WMV, FLV, TS, MPG and more
 - ⚡ **GPU accelerated** — CUDA (NVIDIA), Apple MPS, DirectML (AMD/Intel on Windows)
@@ -272,6 +269,7 @@ pip install -r requirements.txt
 | rawpy | 0.26.1 | RAW photo support |
 | opencv-python | 4.13.0.92 | Video support |
 | Send2Trash | 2.1.0 | Delete to Recycle Bin |
+| tkinterdnd2 | 0.4.3 | Drag and drop image search |
 | torch-directml | latest | ⚙️ Optional — AMD/Intel GPU on Windows |
 | onnxruntime-gpu | 1.23.2 | ⚙️ Optional legacy ONNX (requires code changes) |
 

@@ -2,6 +2,13 @@ import os
 import sys
 import io
 import pickle
+
+# Drag-and-drop support — optional, gracefully disabled if tkinterdnd2 not installed
+try:
+    from tkinterdnd2 import TkinterDnD, DND_FILES
+    _DND_AVAILABLE = True
+except ImportError:
+    _DND_AVAILABLE = False
 import json
 import shutil
 import threading
@@ -701,6 +708,7 @@ class ImageSearchApp:
         # Avoids O(N²) np.concatenate per batch for large collections
         self._pending_image_batches = []
         self._pending_video_batches = []
+        self._cache_lock = threading.Lock()  # guards flush+save vs live search race
 
         # Result type filter (set in build_ui)
         self.show_images_var = None
@@ -872,11 +880,23 @@ class ImageSearchApp:
         try:
             self.clip_model = HybridCLIPModel()
             self.root.after(0, lambda: self.update_status("Ready", "green"))
+            device = self.clip_model.device_name
+            batch = BATCH_SIZE
+            if "CUDA" in device:
+                short = f"GPU  •  Batch {batch}"
+            elif "Metal" in device:
+                short = f"MPS  •  Batch {batch}"
+            elif "DirectML" in device:
+                short = f"DirectML  •  Batch {batch}"
+            else:
+                short = f"CPU  •  Batch {batch}"
+            self.root.after(0, lambda s=short: self.device_label.config(text=s))
             safe_print(f"[LOAD] Success!\n")
         except Exception as e:
             safe_print(f"[ERROR] {e}")
             err_msg = str(e)
             self.root.after(0, lambda: self.update_status("Load Failed", "red"))
+            self.root.after(0, lambda: self.device_label.config(text="Load Failed"))
             self.root.after(0, lambda: messagebox.showerror("Error", f"Failed to load model\n{err_msg}"))
         self.model_loading = False
 
@@ -921,6 +941,8 @@ class ImageSearchApp:
         self.stats_label.pack(side="left")
 
         ttk.Button(top, text="?", command=self.show_index_info, width=3).pack(side="right", padx=(4, 0))
+        self.device_label = ttk.Label(top, text="...", foreground=ACCENT_SECONDARY)
+        self.device_label.pack(side="right", padx=(0, 8))
 
         search_frame = ttk.Frame(self.root, padding=8)
         search_frame.pack(fill="x", padx=8, pady=4)
@@ -931,6 +953,7 @@ class ImageSearchApp:
                                     highlightcolor=ACCENT, highlightbackground=BORDER)
         self.query_entry.pack(side="left", fill="x", expand=True, padx=6)
         self.query_entry.bind("<Return>", lambda e: self.on_search_click())
+        self.query_entry.bind("<Button-3>", self._show_search_context_menu)
         
         ttk.Button(search_frame, text="Search", command=self.on_search_click, width=12, style="Accent.TButton").pack(side="left", padx=4)
         ttk.Button(search_frame, text="Image", command=self.on_image_click, width=10).pack(side="left", padx=4)
@@ -1007,6 +1030,14 @@ class ImageSearchApp:
 
         # Setup rubber-band selection on canvas
         self._setup_rubber_band()
+
+        # Drag and drop — register canvas as drop target if tkinterdnd2 is available
+        if _DND_AVAILABLE:
+            try:
+                self.canvas.drop_target_register(DND_FILES)
+                self.canvas.dnd_bind('<<Drop>>', self._on_drop_image)
+            except Exception:
+                pass  # DnD registration failed silently — app works fine without it
 
         if sys.platform == 'darwin':
             self.canvas.bind_all("<MouseWheel>", lambda e: self.canvas.yview_scroll(int(-1 * e.delta), "units"))
@@ -1090,6 +1121,41 @@ class ImageSearchApp:
         self.cancel_search(clear_ui=True)
         self.image_search()
 
+    def _on_drop_image(self, event):
+        """Handle image file dropped onto the canvas — same restrictions as Image button."""
+        # Respect same guards as on_image_click
+        if self.clip_model is None:
+            messagebox.showwarning("Wait", "Model is still loading, please wait.")
+            return
+        if not self.is_safe_to_act(action_name="image search"):
+            return
+        if not self.folder:
+            messagebox.showwarning("No Folder", "Please select a folder first before searching by image.")
+            return
+        if self.image_embeddings is None and self.video_embeddings is None:
+            messagebox.showwarning("Not Indexed", "Please index a folder first before searching by image.")
+            return
+        # tkinterdnd2 returns path(s) wrapped in braces if they contain spaces: {C:/some path/file.jpg}
+        raw = event.data.strip()
+        if raw.startswith('{') and raw.endswith('}'):
+            path = raw[1:-1]
+        else:
+            # Multiple files dropped — just use the first one
+            path = raw.split()[0]
+        # Only accept image files
+        valid_exts = ('.jpg', '.jpeg', '.png', '.webp', '.bmp', '.gif',
+                      '.cr2', '.nef', '.arw', '.dng', '.orf', '.rw2', '.raf', '.pef', '.sr2')
+        if not path.lower().endswith(valid_exts):
+            messagebox.showwarning("Unsupported File",
+                "Only image files can be used for image search.\nDrop a JPG, PNG, WEBP or RAW file.")
+            return
+        if not os.path.isfile(path):
+            return
+        self.cancel_search(clear_ui=True)
+        gen = self.search_generation + 1
+        self.search_thread = Thread(target=lambda: self._image_search(path, gen), daemon=True)
+        self.search_thread.start()
+
     def _on_results_frame_configure(self, event):
         """Update scrollregion after forcing Tkinter to finish all pending geometry calculations"""
         self.results_frame.update_idletasks()
@@ -1121,6 +1187,7 @@ class ImageSearchApp:
         If indexing is running, offer three choices instead of silently killing the process."""
         if not self.is_indexing and not self.is_stopping:
             self.root.destroy()
+            os._exit(0)
             return
 
         dialog = tk.Toplevel(self.root)
@@ -1165,6 +1232,7 @@ class ImageSearchApp:
                         self.root.destroy()
                     except Exception:
                         pass
+                    os._exit(0)
             self._safe_after(200, _wait)
 
         def quit_anyway():
@@ -1647,6 +1715,14 @@ class ImageSearchApp:
                     elif hasattr(torch.backends, 'mps') and torch.backends.mps.is_available():
                         torch.mps.empty_cache()
 
+                # Periodic save every 5000 images — protects against crash data loss
+                # Lock ensures live search never reads a partially flushed state
+                if processed > 0 and processed % 5000 < BATCH_SIZE:
+                    with self._cache_lock:
+                        self._flush_pending_batches()
+                        self._save_cache()
+                    safe_print(f"[INDEX] Auto-saved at {processed:,} images")
+
                 pct = (processed / total) * 100 if total > 0 else 0
                 msg = f"{'Updating' if is_update else 'Indexing'}: {processed:,}/{total:,}"
                 self._safe_after(0, lambda v=pct, m=msg: self.update_progress(v, m))
@@ -1667,8 +1743,9 @@ class ImageSearchApp:
             except Exception as cleanup_err:
                 safe_print(f"[INDEX] VRAM cleanup warning (non-fatal): {cleanup_err}")
 
-        self._flush_pending_batches()
-        self._save_cache()
+        with self._cache_lock:
+            self._flush_pending_batches()
+            self._save_cache()
         self._handle_stop()
 
     def _process_video_batch(self, file_list, is_update=False):
@@ -1913,6 +1990,13 @@ class ImageSearchApp:
                         self._safe_after(0, lambda v=pct, m=msg: self.update_progress(v, m))
                         safe_print(f"\r[VINDEX] {msg}", end='')
 
+                        # Periodic save every 20 videos — protects against crash data loss
+                        if file_idx > 0 and file_idx % 20 == 0:
+                            with self._cache_lock:
+                                self._flush_pending_batches()
+                                self._save_video_cache()
+                            safe_print(f"[VINDEX] Auto-saved at {file_idx:,} videos")
+
             safe_print("")
 
         finally:
@@ -1926,8 +2010,9 @@ class ImageSearchApp:
             except Exception as cleanup_err:
                 safe_print(f"[VINDEX] VRAM cleanup warning (non-fatal): {cleanup_err}")
 
-        self._flush_pending_batches()  # consolidate accumulated video batches before saving
-        self._save_video_cache()
+        with self._cache_lock:
+            self._flush_pending_batches()  # consolidate accumulated video batches before saving
+            self._save_video_cache()
         self._handle_video_stop()
 
     def index_all_videos(self):
@@ -2494,7 +2579,8 @@ class ImageSearchApp:
             all_results = []
 
             # Flush any pending batches from concurrent indexing before search
-            self._flush_pending_batches()
+            with self._cache_lock:
+                self._flush_pending_batches()
 
             min_score = self.score_var.get()
 
@@ -2919,7 +3005,7 @@ class ImageSearchApp:
 
             var = tk.BooleanVar(value=(path in self.selected_images))
             cb = tk.Checkbutton(f, text="Select", variable=var, bg=CARD_BG, fg=FG,
-                                selectcolor=BG, command=lambda p=path, v=var: self.toggle_selection(p, v.get()))
+                                selectcolor=BG, command=lambda p=path, v=var: self._set_card_selection_by_path(p, v.get()))
             cb.var = var   # keep reference alive — GC would destroy a local BooleanVar
             cb.pack()
 
@@ -3318,17 +3404,54 @@ class ImageSearchApp:
         frame_canvas_y = (self.results_frame.winfo_rooty() - self.canvas.winfo_rooty()
                           + self.canvas.canvasy(0))
 
+        # Collect paths touched by the rubber band rect first, then call
+        # _set_card_selection_by_path for each — this ensures all frames from
+        # the same video get selected/deselected even if only one frame is inside
+        # the rect, matching the right-click context menu behaviour.
+        touched_paths = set()
         for card in self._get_all_cards():
             try:
-                # card.winfo_x/y is relative to results_frame → add frame offset
                 card_x = card.winfo_x() + frame_canvas_x
                 card_y = card.winfo_y() + frame_canvas_y
                 card_w = card.winfo_width()
                 card_h = card.winfo_height()
                 if card_x < x2 and card_x + card_w > x1 and card_y < y2 and card_y + card_h > y1:
-                    self._select_card(card, select=not deselect_mode)
+                    p = getattr(card, '_image_path', None)
+                    if p:
+                        touched_paths.add(p)
             except Exception:
                 pass
+
+        for p in touched_paths:
+            self._set_card_selection_by_path(p, select=not deselect_mode)
+
+    def _show_search_context_menu(self, event):
+        """Right-click context menu for the search bar — Cut, Copy, Paste, Delete"""
+        menu = tk.Menu(self.root, tearoff=0, bg=CARD_BG, fg=FG,
+                       activebackground=ACCENT, activeforeground="#ffffff",
+                       relief="flat", bd=1)
+        has_selection = bool(self.query_entry.selection_present())
+        has_text = bool(self.query_entry.get())
+        try:
+            clipboard_text = self.root.clipboard_get()
+            has_clipboard = bool(clipboard_text)
+        except Exception:
+            has_clipboard = False
+        menu.add_command(label="Cut",   command=lambda: self.query_entry.event_generate("<<Cut>>"),
+                         state="normal" if has_selection else "disabled")
+        menu.add_command(label="Copy",  command=lambda: self.query_entry.event_generate("<<Copy>>"),
+                         state="normal" if has_selection else "disabled")
+        menu.add_command(label="Paste", command=lambda: self.query_entry.event_generate("<<Paste>>"),
+                         state="normal" if has_clipboard else "disabled")
+        menu.add_separator()
+        menu.add_command(label="Select All", command=lambda: self.query_entry.select_range(0, "end"),
+                         state="normal" if has_text else "disabled")
+        menu.add_command(label="Delete",     command=lambda: self.query_entry.delete(0, "end"),
+                         state="normal" if has_text else "disabled")
+        try:
+            menu.tk_popup(event.x_root, event.y_root)
+        finally:
+            menu.grab_release()
 
     def _show_canvas_context_menu(self, event):
         """Right-click on canvas background — general context menu"""
@@ -3658,6 +3781,9 @@ if __name__ == "__main__":
     print("Makimus - AI Media Search (Cross-Platform GPU Accelerated)")
     print("With Relative Path Support for Portability")
     print("=" * 60)
-    root = tk.Tk()
+    if _DND_AVAILABLE:
+        root = TkinterDnD.Tk()
+    else:
+        root = tk.Tk()
     app = ImageSearchApp(root)
     root.mainloop()
