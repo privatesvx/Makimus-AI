@@ -307,7 +307,7 @@ This makes it significantly more versatile for diverse personal media collection
 
 ## 🙏 Contributors
 
-A big thank you to [@jareddishman](https://github.com/jareddishman) for contributing to Makimus-AI through his [fork](https://github.com/jareddishman/Makimus-AI). He developed several key features — **video search**, **bulk file operations**, **folder exclusion rules**, and **negative search term support** — which were manually integrated into the main project after extensive testing, improvements, and bug fixes. Really appreciate the work! 🎉
+A big thank you to [@jareddishman](https://github.com/jareddishman) for his [fork of Makimus-AI](https://github.com/jareddishman/Makimus-AI). His work on **video search**, **bulk file operations**, **folder exclusion rules**, and **negative search term support** served as an inspiration — these features were studied, heavily improved, rewritten, and manually integrated into the main project after extensive testing and bug fixing. Really appreciate the contribution! 🎉
 
 ---
 
